@@ -122,7 +122,9 @@ def process_file_with_ffmpeg(
         elif op_details['op'] == 'copy':
             map_operations.extend([f"-c:a:{output_audio_stream_ffmpeg_idx}", "copy"])
         elif op_details['op'] == 'downmix':
-            map_operations.extend([f"-c:a:{output_audio_stream_ffmpeg_idx}", "aac", f"-b:a:{output_audio_stream_ffmpeg_idx}", "256k", f"-ac:a:{output_audio_stream_ffmpeg_idx}", "2", f"-metadata:s:a:{output_audio_stream_ffmpeg_idx}", f"language={op_details['lang']}"])
+            map_operations.extend([f"-c:a:{output_audio_stream_ffmpeg_idx}", "aac", f"-b:a:{output_audio_stream_ffmpeg_idx}", "256k", f"-ac:a:{output_audio_stream_ffmpeg_idx}", "2", f"-metadata:s:a:{output_audio_stream_ffmpeg_idx}", f"language={op_details['lang']}", f"-metadata:s:a:{output_audio_stream_ffmpeg_idx}", "title=Stereo", f"-disposition:a:{output_audio_stream_ffmpeg_idx}", "0"])
+            if log_commands:
+                logs.append(f"      📋 Downmix: stream #{op_details['index']} ({op_details['lang']}) -> stereo AAC @ 256k")
         output_audio_stream_ffmpeg_idx += 1
     
     ffmpeg_cmd.extend(map_operations)
