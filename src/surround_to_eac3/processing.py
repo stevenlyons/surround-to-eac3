@@ -121,6 +121,10 @@ def process_file_with_ffmpeg(
             map_operations.extend([f"-c:a:{output_audio_stream_ffmpeg_idx}", "eac3", f"-b:a:{output_audio_stream_ffmpeg_idx}", audio_bitrate, f"-ac:a:{output_audio_stream_ffmpeg_idx}", "6", f"-metadata:s:a:{output_audio_stream_ffmpeg_idx}", f"language={op_details['lang']}"])
         elif op_details['op'] == 'copy':
             map_operations.extend([f"-c:a:{output_audio_stream_ffmpeg_idx}", "copy"])
+        elif op_details['op'] == 'downmix':
+            map_operations.extend([f"-c:a:{output_audio_stream_ffmpeg_idx}", "aac", f"-b:a:{output_audio_stream_ffmpeg_idx}", "256k", f"-ac:a:{output_audio_stream_ffmpeg_idx}", "2", f"-metadata:s:a:{output_audio_stream_ffmpeg_idx}", f"language={op_details['lang']}", f"-metadata:s:a:{output_audio_stream_ffmpeg_idx}", "title=Stereo", f"-disposition:a:{output_audio_stream_ffmpeg_idx}", "0"])
+            if log_commands:
+                logs.append(f"      📋 Downmix: stream #{op_details['index']} ({op_details['lang']}) -> stereo AAC @ 256k")
         output_audio_stream_ffmpeg_idx += 1
     
     ffmpeg_cmd.extend(map_operations)
@@ -228,6 +232,18 @@ def process_single_file(
             if op_to_perform:
                 audio_ops_for_ffmpeg.append({'index': stream['index'], 'op': op_to_perform, 'lang': lang})
 
+    # Add stereo downmix ops for each 5.1 stream if --downmix is enabled
+    downmix_enabled = getattr(args, 'downmix', False)
+    if downmix_enabled:
+        downmix_ops = []
+        for op in audio_ops_for_ffmpeg:
+            # Find the original stream to check channel count
+            orig_stream = next((s for s in audio_streams_details if s['index'] == op['index']), None)
+            if orig_stream and orig_stream.get('channels') == 6:
+                downmix_ops.append({'index': op['index'], 'op': 'downmix', 'lang': op['lang']})
+                file_specific_logs.append(f"      🔉 Will downmix: Audio stream #{op['index']} ({op['lang']}) -> stereo AAC")
+        audio_ops_for_ffmpeg.extend(downmix_ops)
+
     if not audio_ops_for_ffmpeg:
         file_specific_logs.append(f"      ⏭️ Skipping '{display_name}': No target audio streams to process (copy/transcode).")
         with tqdm_lock:
@@ -235,9 +251,9 @@ def process_single_file(
                 tqdm.write(log_msg, file=tqdm_file_writer)
         final_status = "skipped_no_ops"
         return final_status
-    
-    needs_transcode = any(op['op'] == 'transcode' for op in audio_ops_for_ffmpeg)
-    if not needs_transcode:
+
+    needs_processing = any(op['op'] in ('transcode', 'downmix') for op in audio_ops_for_ffmpeg)
+    if not needs_processing:
         file_specific_logs.append(f"      ⏭️ Skipping '{display_name}': No transcoding required.")
         with tqdm_lock:
             for log_msg in file_specific_logs:
