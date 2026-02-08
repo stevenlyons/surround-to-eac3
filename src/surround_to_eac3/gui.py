@@ -140,9 +140,13 @@ class TranscoderApp(ctk.CTk):
         self.force_reprocess_check = ctk.CTkCheckBox(self.options_frame, text="Force Reprocess (Overwrite existing)", variable=self.force_reprocess_var)
         self.force_reprocess_check.grid(row=5, column=1, padx=10, pady=10, sticky="w")
 
+        self.downmix_var = ctk.IntVar()
+        self.downmix_check = ctk.CTkCheckBox(self.options_frame, text="Downmix 5.1 to Stereo (add 2ch AAC track)", variable=self.downmix_var)
+        self.downmix_check.grid(row=6, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="w")
+
         # Load Config Button
         self.load_config_button = ctk.CTkButton(self.options_frame, text="Load Config...", width=80, command=self.load_config_from_file)
-        self.load_config_button.grid(row=5, column=3, padx=(0, 10), pady=10, sticky="e")
+        self.load_config_button.grid(row=6, column=3, padx=(0, 10), pady=(0, 10), sticky="e")
 
 
         # --- Widgets: Log ---
@@ -224,6 +228,7 @@ class TranscoderApp(ctk.CTk):
         # Checkboxes
         self.dry_run_var.set(config.get("dry_run", 0))
         self.force_reprocess_var.set(config.get("force_reprocess", 0))
+        self.downmix_var.set(config.get("downmix", 0))
 
     # --- Button Callbacks ---
     def select_input_file(self):
@@ -282,7 +287,8 @@ class TranscoderApp(ctk.CTk):
             languages=self.langs_entry.get(),
             jobs=int(self.jobs_slider.get()),
             dry_run=bool(self.dry_run_var.get()),
-            force_reprocess=bool(self.force_reprocess_var.get())
+            force_reprocess=bool(self.force_reprocess_var.get()),
+            downmix=bool(self.downmix_var.get())
         )
 
         # 3. Setup locks and queues for this job

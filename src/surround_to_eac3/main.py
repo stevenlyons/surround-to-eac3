@@ -106,6 +106,11 @@ def main():
         action="store_true",
         help="Force reprocessing of all files, even if an output file with the target name already exists."
     )
+    parser.add_argument(
+        "--downmix",
+        action="store_true",
+        help="Add a stereo (2ch) AAC downmix track for each 5.1 surround audio stream."
+    )
     
     # --- Configuration File Logic (unchanged) ---
     config = {}
