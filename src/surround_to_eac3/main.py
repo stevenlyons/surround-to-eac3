@@ -106,6 +106,11 @@ def main():
         action="store_true",
         help="Force reprocessing of all files, even if an output file with the target name already exists."
     )
+    parser.add_argument(
+        "--log-commands",
+        action="store_true",
+        help="Log the full ffmpeg commands used for transcoding."
+    )
     
     # --- Configuration File Logic (unchanged) ---
     config = {}
