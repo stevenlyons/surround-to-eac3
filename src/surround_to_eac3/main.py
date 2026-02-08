@@ -107,6 +107,11 @@ def main():
         help="Force reprocessing of all files, even if an output file with the target name already exists."
     )
     parser.add_argument(
+        "--log-commands",
+        action="store_true",
+        help="Log the full ffmpeg commands used for transcoding."
+    )
+    parser.add_argument(
         "--downmix",
         action="store_true",
         help="Add a stereo (2ch) AAC downmix track for each 5.1 surround audio stream."

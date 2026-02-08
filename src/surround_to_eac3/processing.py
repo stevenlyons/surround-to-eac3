@@ -1,5 +1,6 @@
 import subprocess
 import os
+import shlex
 import shutil
 import json
 import sys
@@ -9,11 +10,12 @@ from tqdm import tqdm
 SUPPORTED_EXTENSIONS = (".mkv", ".mp4")
 
 
-def get_video_duration(filepath: str) -> float:
+def get_video_duration(filepath: str, log_commands: bool = False) -> tuple[float, list[str]]:
     """Gets the duration of a video file in seconds."""
+    logs = []
     if not shutil.which("ffprobe"):
-        return 0.0
-    
+        return 0.0, logs
+
     command = [
         "ffprobe",
         "-v", "error",
@@ -21,14 +23,16 @@ def get_video_duration(filepath: str) -> float:
         "-of", "default=noprint_wrappers=1:nokey=1",
         filepath
     ]
+    if log_commands:
+        logs.append(f"      📋 CMD: {shlex.join(command)}")
     try:
         process = subprocess.run(command, capture_output=True, text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-        return float(process.stdout.strip())
+        return float(process.stdout.strip()), logs
     except (subprocess.CalledProcessError, ValueError):
-        return 0.0
+        return 0.0, logs
 
 
-def get_stream_info(filepath: str, stream_type: str = "audio") -> tuple[list[dict], list[str]]:
+def get_stream_info(filepath: str, stream_type: str = "audio", log_commands: bool = False) -> tuple[list[dict], list[str]]:
     """
     Retrieves details for specified stream types (audio, video, subtitle) in a file.
     """
@@ -47,6 +51,9 @@ def get_stream_info(filepath: str, stream_type: str = "audio") -> tuple[list[dic
         "ffprobe", "-v", "quiet", "-print_format", "json",
         "-show_streams", "-select_streams", select_streams_option, filepath
     ]
+
+    if log_commands:
+        logs.append(f"      📋 CMD: {shlex.join(ffprobe_cmd)}")
 
     try:
         process = subprocess.run(
@@ -86,7 +93,8 @@ def process_file_with_ffmpeg(
     duration: float,
     pbar_position: int,
     tqdm_lock,
-    tqdm_file_writer=sys.stderr
+    tqdm_file_writer=sys.stderr,
+    log_commands: bool = False
 ) -> tuple[bool, list[str]]:
     """
     Processes a single video file using ffmpeg, writing to a temporary file first.
@@ -127,6 +135,9 @@ def process_file_with_ffmpeg(
     ffmpeg_cmd.extend(["-y", "-v", "quiet", "-stats_period", "1", "-progress", "pipe:1", temp_output_filepath])
 
     logs.append(f"      ⚙️ Processing: '{base_filename}' -> '{output_filename}'")
+
+    if log_commands:
+        logs.append(f"      📋 CMD: {shlex.join(ffmpeg_cmd)}")
 
     process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
 
@@ -187,7 +198,9 @@ def process_single_file(
     
     target_languages = [lang.strip().lower() for lang in args.languages.split(',') if lang.strip()]
 
-    audio_streams_details, get_info_logs = get_stream_info(filepath, "audio")
+    log_commands = getattr(args, 'log_commands', False)
+
+    audio_streams_details, get_info_logs = get_stream_info(filepath, "audio", log_commands=log_commands)
     file_specific_logs.extend(get_info_logs)
     
     audio_ops_for_ffmpeg = []
@@ -292,16 +305,18 @@ def process_single_file(
                     tqdm.write(log_msg, file=tqdm_file_writer)
             return "failed"
             
-    duration = get_video_duration(filepath)
+    duration, duration_logs = get_video_duration(filepath, log_commands=log_commands)
+    file_specific_logs.extend(duration_logs)
     if duration == 0:
         file_specific_logs.append(f"      ⚠️ Could not determine duration for '{display_name}'. Per-file progress will not be shown.")
     
     temp_filepath = final_output_filepath + ".tmp"
     try:
         success, ffmpeg_logs = process_file_with_ffmpeg(
-            filepath, final_output_filepath, args.audio_bitrate, 
+            filepath, final_output_filepath, args.audio_bitrate,
             audio_ops_for_ffmpeg, duration, pbar_position,
-            tqdm_lock, tqdm_file_writer
+            tqdm_lock, tqdm_file_writer,
+            log_commands=log_commands
         )
         file_specific_logs.extend(ffmpeg_logs)
         final_status = "processed" if success else "failed"
